@@ -1,0 +1,1 @@
+terraform import watchpoint_domain_monitor.primary mon_dom_001

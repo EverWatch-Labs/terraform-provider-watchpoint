@@ -1,0 +1,1 @@
+terraform import watchpoint_ssl_monitor.example mon_ssl_001

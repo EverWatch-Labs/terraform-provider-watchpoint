@@ -1,0 +1,1 @@
+terraform import watchpoint_tenant_security_settings.this <tenant_id>

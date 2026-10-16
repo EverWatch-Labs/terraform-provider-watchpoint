@@ -1,0 +1,1 @@
+terraform import watchpoint_tcp_monitor.example mon_tcp_001

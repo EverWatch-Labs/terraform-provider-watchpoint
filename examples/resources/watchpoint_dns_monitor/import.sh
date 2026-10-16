@@ -1,0 +1,1 @@
+terraform import watchpoint_dns_monitor.example mon_dns_001

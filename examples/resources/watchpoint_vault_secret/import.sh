@@ -1,0 +1,1 @@
+terraform import watchpoint_vault_secret.example vlt_abc123

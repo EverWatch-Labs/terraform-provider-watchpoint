@@ -1,0 +1,88 @@
+name: ci-cd
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build_test:
+    name: Build, vet, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - run: go mod download
+      - run: go build ./...
+      - run: go vet ./...
+      - run: go test ./... -count=1
+
+  release:
+    name: GoReleaser -> sign -> publish GitHub release
+    needs: build_test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    # Only allows v* tags, and it's the subject the Azure login trusts.
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Isolate credentials
+        run: |
+          echo "AZURE_CONFIG_DIR=$RUNNER_TEMP/azure" >> "$GITHUB_ENV"
+          mkdir -p -m 700 "$RUNNER_TEMP/gnupg"
+          echo "GNUPGHOME=$RUNNER_TEMP/gnupg" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Import GPG signing key
+        run: |
+          set -euo pipefail
+          key=$(az keyvault secret show --vault-name mgmt-wp-na01-kv --name GPG-PRIVATE-KEY --query value -o tsv)
+          pass=$(az keyvault secret show --vault-name mgmt-wp-na01-kv --name GPG-PASSPHRASE --query value -o tsv)
+          echo "::add-mask::$pass"
+          echo "GPG_PASSPHRASE=$pass" >> "$GITHUB_ENV"
+          printf '%s' "$key" | gpg --batch --import
+          fp=$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr:/ { print $10; exit }')
+          if [ -z "$fp" ]; then echo "No GPG signing key was imported."; exit 1; fi
+          echo "GPG_FINGERPRINT=$fp" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - uses: goreleaser/goreleaser-action@v7
+        with:
+          version: '~> v2'
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Remove signing key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/gnupg"

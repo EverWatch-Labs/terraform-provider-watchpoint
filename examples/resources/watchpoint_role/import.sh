@@ -1,0 +1,1 @@
+terraform import watchpoint_role.example role_001

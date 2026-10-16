@@ -1,0 +1,1 @@
+terraform import watchpoint_synthetic_monitor.example mon_synth_001

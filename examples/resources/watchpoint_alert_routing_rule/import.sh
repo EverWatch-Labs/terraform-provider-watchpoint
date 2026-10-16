@@ -1,0 +1,1 @@
+terraform import watchpoint_alert_routing_rule.database_to_data_team arr_001

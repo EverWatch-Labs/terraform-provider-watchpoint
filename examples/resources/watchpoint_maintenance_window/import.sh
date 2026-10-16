@@ -1,0 +1,1 @@
+terraform import watchpoint_maintenance_window.example mw_001

@@ -1,0 +1,1 @@
+terraform import watchpoint_auth_profile.payments_api auth_abc123

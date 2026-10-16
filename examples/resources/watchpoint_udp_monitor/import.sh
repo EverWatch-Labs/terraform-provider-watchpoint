@@ -1,0 +1,1 @@
+terraform import watchpoint_udp_monitor.resolver mon_udp_001

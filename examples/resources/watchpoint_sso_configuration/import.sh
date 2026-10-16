@@ -1,0 +1,1 @@
+terraform import watchpoint_sso_configuration.example sso_001

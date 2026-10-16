@@ -1,0 +1,1 @@
+terraform import watchpoint_mail_monitor.relay mon_mail_001

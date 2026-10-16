@@ -1,0 +1,1 @@
+terraform import watchpoint_log_archive_destination.this <tenant_id>

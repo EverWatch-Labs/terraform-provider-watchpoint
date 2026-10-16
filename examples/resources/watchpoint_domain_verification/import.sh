@@ -1,0 +1,1 @@
+terraform import watchpoint_domain_verification.example dv_001

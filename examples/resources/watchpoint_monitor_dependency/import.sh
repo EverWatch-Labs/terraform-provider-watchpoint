@@ -1,0 +1,1 @@
+terraform import watchpoint_monitor_dependency.example dep_001

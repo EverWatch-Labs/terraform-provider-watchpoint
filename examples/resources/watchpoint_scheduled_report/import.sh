@@ -1,0 +1,1 @@
+terraform import watchpoint_scheduled_report.example rpt_001

@@ -1,0 +1,1 @@
+terraform import watchpoint_composite_alert_rule.example rule_001

@@ -1,0 +1,1 @@
+terraform import watchpoint_ping_monitor.example mon_ping_001

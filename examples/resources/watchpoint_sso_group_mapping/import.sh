@@ -1,0 +1,1 @@
+terraform import watchpoint_sso_group_mapping.example sso_001/map_001

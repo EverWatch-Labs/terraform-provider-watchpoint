@@ -1,0 +1,1 @@
+terraform import watchpoint_user_group.example grp_001

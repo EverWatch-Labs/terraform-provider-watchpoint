@@ -1,0 +1,1 @@
+terraform import watchpoint_sgl_alert_rule.example sgl_001
