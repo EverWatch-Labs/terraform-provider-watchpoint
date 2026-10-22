@@ -9,6 +9,8 @@ on:
   pull_request:
     branches:
       - main
+  # tag_release dispatches the release onto the new tag; GITHUB_TOKEN tag pushes start no runs.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -32,6 +34,37 @@ jobs:
       - run: go build ./...
       - run: go vet ./...
       - run: go test ./... -count=1
+
+  # A main push whose VERSION has no tag yet tags it and starts the release run on that tag.
+  tag_release:
+    name: Tag VERSION and dispatch release
+    needs: build_test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Tag and dispatch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="v$(tr -d '[:space:]' < VERSION)"
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "$tag already exists; nothing to release."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$tag" -m "$tag"
+          git push origin "$tag"
+          gh workflow run ci-cd.yml --ref "$tag"
+          echo "Tagged $tag and dispatched the release run."
 
   release:
     name: GoReleaser -> sign -> publish GitHub release

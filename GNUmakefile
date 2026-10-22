@@ -2,7 +2,7 @@
 # `make` requirements: Go 1.24+, and (for `docs`) the tfplugindocs tool.
 
 BINARY  := terraform-provider-watchpoint
-# Bump VERSION to release; `make release` tags v$(VERSION) and CI publishes it.
+# Bump VERSION to release: merging to main tags v$(VERSION) and CI publishes it.
 VERSION := $(strip $(file < VERSION))
 
 .PHONY: build install fmt vet test docs clean tidy release
@@ -37,7 +37,7 @@ tidy:
 docs:
 	tfplugindocs generate --provider-name watchpoint
 
-## release: tag the current commit v$(VERSION) and push it; the ci-cd release job does the rest.
+## release: manual fallback; tags the current commit v$(VERSION) and pushes it (CI normally does this on main).
 release:
 	git tag -a v$(VERSION) -m "v$(VERSION)"
 	git push origin v$(VERSION)
