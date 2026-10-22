@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.1.0 (Unreleased)
+## 1.2.0 (Unreleased)
 
 FEATURES:
 
@@ -47,6 +47,10 @@ FEATURES:
   (defaults to `TF_WORKSPACE`, else `default`). `terraform import` sends one empty
   update to record the marker; if that fails the import still succeeds with a
   warning. See the "Managed monitors" guide.
+
+## 1.1.0 (2026-10-16)
+
+FEATURES:
 
 * **New Resource:** `watchpoint_agent_enrollment_token` - mints a bounded-use
   agent enrollment token (Region API, `/agents/enrollment-tokens`). `token` and
