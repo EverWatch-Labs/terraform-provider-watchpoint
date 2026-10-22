@@ -39,7 +39,7 @@ var (
 // Enum names accepted by the alerting API, validated here so a typo fails at
 // plan time instead of arriving as an opaque JSON deserialization 400.
 var (
-	alertRoutingConditionTypes = []string{"MonitorTag", "MonitorGroup", "MonitorType", "Severity", "ServiceName", "TimeWindow"}
+	alertRoutingConditionTypes = []string{"MonitorTag", "MonitorGroup", "MonitorType", "Severity", "ServiceName", "TimeWindow", "Environment"}
 	alertRoutingOperators      = []string{"In", "NotIn", "Contains", "NotContains"}
 	alertRoutingTargetTypes    = []string{"AlertProfile", "Channel", "EscalationPolicy"}
 )
@@ -207,7 +207,8 @@ func (r *alertRoutingRuleResource) Schema(_ context.Context, _ resource.SchemaRe
 					Attributes: map[string]schema.Attribute{
 						"condition_type": schema.StringAttribute{
 							MarkdownDescription: "What to match on. One of `MonitorTag`, `MonitorGroup`, " +
-								"`MonitorType`, `Severity`, `ServiceName`, `TimeWindow`.",
+								"`MonitorType`, `Severity`, `ServiceName`, `TimeWindow`, `Environment` (the monitor's " +
+								"environment key, such as `production`).",
 							Required:   true,
 							Validators: []validator.String{stringvalidator.OneOf(alertRoutingConditionTypes...)},
 						},

@@ -4,10 +4,14 @@ import (
 	"context"
 
 	"github.com/everwatch-labs/terraform-provider-watchpoint/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -27,6 +31,7 @@ type monitorCommonModel struct {
 	SlaProfileID         types.String `tfsdk:"sla_profile_id"`
 	GroupID              types.String `tfsdk:"group_id"`
 	Tags                 types.Set    `tfsdk:"tags"`
+	EnvironmentID        types.String `tfsdk:"environment_id"`
 	Status               types.String `tfsdk:"status"`
 	LastCheckStatus      types.String `tfsdk:"last_check_status"`
 	CreatedAt            types.String `tfsdk:"created_at"`
@@ -44,6 +49,7 @@ type monitorCommonBody struct {
 	AlertProfileID       *string `json:"alertProfileId,omitempty"`
 	GroupID              *string `json:"groupId,omitempty"`
 	Tags                 *string `json:"tags,omitempty"`
+	EnvironmentID        *string `json:"environmentId,omitempty"`
 }
 
 type monitorCommonResponse struct {
@@ -58,6 +64,7 @@ type monitorCommonResponse struct {
 	SlaProfileID         *string `json:"slaProfileId"`
 	GroupID              *string `json:"groupId"`
 	Tags                 *string `json:"tags"`
+	EnvironmentID        *string `json:"environmentId"`
 	LastCheckStatus      *string `json:"lastCheckStatus"`
 	CreatedAt            string  `json:"createdAt"`
 }
@@ -72,6 +79,7 @@ func (m *monitorCommonModel) body(ctx context.Context, update bool, ds *diagSink
 		AlertProfileID:       strPtr(m.AlertProfileID),
 		GroupID:              strPtr(m.GroupID),
 		Tags:                 csvPtrFromSet(ctx, m.Tags, ds.d),
+		EnvironmentID:        strPtr(m.EnvironmentID),
 	}
 	if update {
 		b.LocationProfileID = strPtrClearing(m.LocationProfileID)
@@ -94,6 +102,7 @@ func (m *monitorCommonModel) apply(ctx context.Context, in *monitorCommonRespons
 	m.SlaProfileID = strFromPtr(in.SlaProfileID)
 	m.GroupID = strFromPtr(in.GroupID)
 	m.Tags = setFromCSVPtr(ctx, in.Tags, ds.d)
+	m.EnvironmentID = strFromPtr(in.EnvironmentID)
 	m.Status = types.StringValue(in.Status)
 	m.LastCheckStatus = strFromPtr(in.LastCheckStatus)
 	m.CreatedAt = types.StringValue(in.CreatedAt)
@@ -149,6 +158,7 @@ func monitorCommonAttributes(defaultInterval, defaultTimeout int64) map[string]s
 			MarkdownDescription: "Monitor group this monitor belongs to.",
 			Optional:            true,
 		},
+		"environment_id": environmentIDAttribute(),
 		"tags": schema.SetAttribute{
 			MarkdownDescription: "Free-form tags surfaced in filters and SGL queries. Unordered.",
 			Optional:            true,
@@ -169,6 +179,40 @@ func monitorCommonAttributes(defaultInterval, defaultTimeout int64) map[string]s
 	}
 }
 
+// environmentIDAttribute is the environment_id schema every monitor type shares.
+func environmentIDAttribute() schema.StringAttribute {
+	return schema.StringAttribute{
+		MarkdownDescription: "Environment the monitor belongs to (a `watchpoint_environment` id). When omitted, a new " +
+			"monitor joins the tenant's default environment and an existing one keeps its environment. Reads return " +
+			"the effective environment, so a monitor that follows the default shows the default's id.",
+		Optional:      true,
+		Computed:      true,
+		PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+	}
+}
+
+// contentChangeModeAttribute and contentIgnoreRegexAttribute are the HTTP and synthetic content change fields.
+func contentChangeModeAttribute() schema.StringAttribute {
+	return schema.StringAttribute{
+		MarkdownDescription: "Content change detection: `off`, `record` (store a snapshot when the normalized body " +
+			"changes) or `alert` (also raise a Warning until the change is accepted in the portal). Defaults to " +
+			"`off`. Turning it on requires the content change detection feature.",
+		Optional:   true,
+		Computed:   true,
+		Default:    stringdefault.StaticString("off"),
+		Validators: []validator.String{stringvalidator.OneOf("off", "record", "alert")},
+	}
+}
+
+func contentIgnoreRegexAttribute() schema.StringAttribute {
+	return schema.StringAttribute{
+		MarkdownDescription: "Regular expression whose matches are removed before content is compared, for " +
+			"timestamps, nonces and similar noise. RE2 subset: no backreferences or lookaround.",
+		Optional:   true,
+		Validators: []validator.String{stringvalidator.LengthAtMost(1024)},
+	}
+}
+
 // monitorAPI is the create/read/update/delete flow every per-type monitor
 // endpoint shares: POST returns {id}, the SLA profile goes through its own
 // attach endpoint, and every write is followed by a GET of the canonical row.
@@ -186,11 +230,11 @@ func (a monitorAPI) path(id string) string {
 
 func (a monitorAPI) create(ctx context.Context, body any, sla types.String, out any) error {
 	var created idNameResponse
-	if err := a.client.Post(ctx, a.path(""), body, &created); err != nil {
+	if err := a.client.PostManaged(ctx, a.path(""), body, &created, monitorAddress(a.kind)); err != nil {
 		return err
 	}
 	if slaIsSet(sla) {
-		if err := applySlaProfile(ctx, a.client, created.ID, sla); err != nil {
+		if err := applySlaProfile(ctx, a.client, monitorAddress(a.kind), created.ID, sla); err != nil {
 			return err
 		}
 	}
@@ -198,11 +242,11 @@ func (a monitorAPI) create(ctx context.Context, body any, sla types.String, out 
 }
 
 func (a monitorAPI) update(ctx context.Context, id string, body any, sla, priorSla types.String, out any) error {
-	if err := a.client.Patch(ctx, a.path(id), body, nil); err != nil {
+	if err := a.client.PatchManaged(ctx, a.path(id), body, nil, monitorAddress(a.kind)); err != nil {
 		return err
 	}
 	if !sla.Equal(priorSla) {
-		if err := applySlaProfile(ctx, a.client, id, sla); err != nil {
+		if err := applySlaProfile(ctx, a.client, monitorAddress(a.kind), id, sla); err != nil {
 			return err
 		}
 	}
@@ -221,8 +265,26 @@ func (a monitorAPI) read(ctx context.Context, id string, out any) (bool, error) 
 }
 
 func (a monitorAPI) delete(ctx context.Context, id string) error {
-	if err := a.client.Delete(ctx, a.path(id)); err != nil && !client.IsNotFound(err) {
+	if err := a.client.DeleteManaged(ctx, a.path(id), monitorAddress(a.kind)); err != nil && !client.IsNotFound(err) {
 		return err
 	}
 	return nil
+}
+
+// monitorAddress is the resource type name sent as the managed-by address.
+func monitorAddress(kind string) string { return "watchpoint_" + kind + "_monitor" }
+
+// importManagedMonitor imports by id, then sends an empty managed PATCH so the
+// server records the monitor as managed by Terraform. Failure only warns: the next apply stamps it.
+func importManagedMonitor(ctx context.Context, c *client.Client, kind string, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	importByID(ctx, req, resp)
+	if resp.Diagnostics.HasError() || c == nil {
+		return
+	}
+	err := c.PatchManaged(ctx, c.Tenantf("/monitoring", "/monitors/%s/%s", kind, req.ID), struct{}{}, nil, monitorAddress(kind))
+	if err != nil {
+		resp.Diagnostics.AddWarning("Monitor not yet marked as managed by Terraform",
+			"The import succeeded, but marking the monitor as managed failed: "+err.Error()+
+				". The next terraform apply that changes this monitor records it.")
+	}
 }

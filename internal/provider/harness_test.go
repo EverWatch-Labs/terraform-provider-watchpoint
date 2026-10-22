@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
@@ -31,6 +32,7 @@ type recordedRequest struct {
 	Query  string
 	Body   map[string]any
 	Raw    string
+	Header http.Header
 }
 
 type fakeAPI struct {
@@ -57,7 +59,7 @@ func (f *fakeAPI) on(methodAndPath string, h func(r recordedRequest) (int, any))
 
 func (f *fakeAPI) serve(w http.ResponseWriter, r *http.Request) {
 	raw, _ := io.ReadAll(r.Body)
-	rec := recordedRequest{Method: r.Method, Path: r.URL.Path, Query: r.URL.RawQuery, Raw: string(raw)}
+	rec := recordedRequest{Method: r.Method, Path: r.URL.Path, Query: r.URL.RawQuery, Raw: string(raw), Header: r.Header.Clone()}
 	if len(raw) > 0 {
 		_ = json.Unmarshal(raw, &rec.Body)
 	}
@@ -144,7 +146,7 @@ func tfCreate[M any](t *testing.T, f *fakeAPI, r resource.Resource, plan M) M {
 		t.Fatalf("plan set: %v", d)
 	}
 	resp := resource.CreateResponse{State: state}
-	r.Create(ctx, resource.CreateRequest{Plan: p}, &resp)
+	r.Create(ctx, resource.CreateRequest{Plan: p, Config: tfsdk.Config{Schema: p.Schema, Raw: p.Raw}}, &resp)
 	if resp.Diagnostics.HasError() {
 		t.Fatalf("create: %v", resp.Diagnostics)
 	}
@@ -191,7 +193,7 @@ func tfUpdate[M any](t *testing.T, f *fakeAPI, r resource.Resource, prior, plan 
 		t.Fatalf("plan set: %v", d)
 	}
 	resp := resource.UpdateResponse{State: state}
-	r.Update(ctx, resource.UpdateRequest{Plan: p, State: state}, &resp)
+	r.Update(ctx, resource.UpdateRequest{Plan: p, State: state, Config: tfsdk.Config{Schema: p.Schema, Raw: p.Raw}}, &resp)
 	if resp.Diagnostics.HasError() {
 		t.Fatalf("update: %v", resp.Diagnostics)
 	}
@@ -255,4 +257,10 @@ func mustContain(t *testing.T, haystack, needle string) {
 	if !strings.Contains(haystack, needle) {
 		t.Fatalf("%q does not contain %q", haystack, needle)
 	}
+}
+
+// strSet builds a known string set; no values gives an empty (not null) set.
+func strSet(vals ...string) types.Set {
+	s, _ := types.SetValueFrom(context.Background(), types.StringType, append([]string{}, vals...))
+	return s
 }

@@ -61,6 +61,9 @@ type syntheticMonitorModel struct {
 	SlaProfileID             types.String  `tfsdk:"sla_profile_id"`
 	GroupID                  types.String  `tfsdk:"group_id"`
 	Tags                     types.Set     `tfsdk:"tags"`
+	EnvironmentID            types.String  `tfsdk:"environment_id"`
+	ContentChangeMode        types.String  `tfsdk:"content_change_mode"`
+	ContentIgnoreRegex       types.String  `tfsdk:"content_ignore_regex"`
 	Status                   types.String  `tfsdk:"status"`
 	CreatedAt                types.String  `tfsdk:"created_at"`
 }
@@ -93,6 +96,9 @@ type syntheticMonitorCreateBody struct {
 	AlertProfileID           *string  `json:"alertProfileId,omitempty"`
 	GroupID                  *string  `json:"groupId,omitempty"`
 	Tags                     *string  `json:"tags,omitempty"`
+	EnvironmentID            *string  `json:"environmentId,omitempty"`
+	ContentChangeMode        *string  `json:"contentChangeMode,omitempty"`
+	ContentIgnoreRegex       *string  `json:"contentIgnoreRegex,omitempty"`
 }
 
 // syntheticMonitorUpdateBody mirrors the PATCH DTO; pointers omit unchanged fields.
@@ -127,6 +133,9 @@ type syntheticMonitorResponse struct {
 	SlaProfileID             *string `json:"slaProfileId"`
 	GroupID                  *string `json:"groupId"`
 	Tags                     *string `json:"tags"`
+	EnvironmentID            *string `json:"environmentId,omitempty"`
+	ContentChangeMode        *string `json:"contentChangeMode,omitempty"`
+	ContentIgnoreRegex       *string `json:"contentIgnoreRegex,omitempty"`
 	CreatedAt                string  `json:"createdAt"`
 }
 
@@ -272,6 +281,9 @@ func (r *syntheticMonitorResource) Schema(_ context.Context, _ resource.SchemaRe
 				MarkdownDescription: "Monitor group this monitor belongs to.",
 				Optional:            true,
 			},
+			"environment_id":       environmentIDAttribute(),
+			"content_change_mode":  contentChangeModeAttribute(),
+			"content_ignore_regex": contentIgnoreRegexAttribute(),
 			"tags": schema.SetAttribute{
 				MarkdownDescription: "Free-form tags surfaced in filters and SGL queries (`attributes.tags`). Unordered.",
 				Optional:            true,
@@ -316,6 +328,9 @@ func (m *syntheticMonitorModel) toCreateBody(ctx context.Context, diags *diagSin
 		AlertProfileID:           strPtr(m.AlertProfileID),
 		GroupID:                  strPtr(m.GroupID),
 		Tags:                     csvPtrFromSet(ctx, m.Tags, diags.d),
+		EnvironmentID:            strPtr(m.EnvironmentID),
+		ContentChangeMode:        strPtr(m.ContentChangeMode),
+		ContentIgnoreRegex:       strPtr(m.ContentIgnoreRegex),
 	}
 }
 
@@ -348,6 +363,9 @@ func (m *syntheticMonitorModel) applyResponse(ctx context.Context, resp *synthet
 	m.SlaProfileID = strFromPtr(resp.SlaProfileID)
 	m.GroupID = strFromPtr(resp.GroupID)
 	m.Tags = setFromCSVPtr(ctx, resp.Tags, diags.d)
+	m.EnvironmentID = strFromPtr(resp.EnvironmentID)
+	m.ContentChangeMode = strFromPtr(resp.ContentChangeMode)
+	m.ContentIgnoreRegex = strFromPtr(resp.ContentIgnoreRegex)
 	m.Status = types.StringValue(resp.Status)
 	m.CreatedAt = types.StringValue(resp.CreatedAt)
 }
@@ -367,13 +385,13 @@ func (r *syntheticMonitorResource) Create(ctx context.Context, req resource.Crea
 
 	var created idNameResponse
 	path := r.client.Tenantf("/monitoring", "/monitors/synthetic")
-	if err := r.client.Post(ctx, path, body, &created); err != nil {
+	if err := r.client.PostManaged(ctx, path, body, &created, monitorAddress("synthetic")); err != nil {
 		resp.Diagnostics.AddError("Error creating synthetic monitor", err.Error())
 		return
 	}
 
 	if slaIsSet(plan.SlaProfileID) {
-		if err := applySlaProfile(ctx, r.client, created.ID, plan.SlaProfileID); err != nil {
+		if err := applySlaProfile(ctx, r.client, monitorAddress("synthetic"), created.ID, plan.SlaProfileID); err != nil {
 			resp.Diagnostics.AddError("Error attaching SLA profile to synthetic monitor", err.Error())
 			return
 		}
@@ -424,12 +442,13 @@ func (r *syntheticMonitorResource) Update(ctx context.Context, req resource.Upda
 	body := plan.toCreateBody(ctx, ds)
 	// An emptied tag set has to reach the API as "" or the old tags survive the PATCH.
 	body.Tags = csvPtrClearing(ctx, plan.Tags, &resp.Diagnostics)
+	body.ContentIgnoreRegex = strPtrClearing(plan.ContentIgnoreRegex)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	path := r.client.Tenantf("/monitoring", "/monitors/synthetic/%s", plan.ID.ValueString())
-	if err := r.client.Patch(ctx, path, body, nil); err != nil {
+	if err := r.client.PatchManaged(ctx, path, body, nil, monitorAddress("synthetic")); err != nil {
 		resp.Diagnostics.AddError("Error updating synthetic monitor", err.Error())
 		return
 	}
@@ -437,7 +456,7 @@ func (r *syntheticMonitorResource) Update(ctx context.Context, req resource.Upda
 	var priorState syntheticMonitorModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &priorState)...)
 	if !resp.Diagnostics.HasError() && !plan.SlaProfileID.Equal(priorState.SlaProfileID) {
-		if err := applySlaProfile(ctx, r.client, plan.ID.ValueString(), plan.SlaProfileID); err != nil {
+		if err := applySlaProfile(ctx, r.client, monitorAddress("synthetic"), plan.ID.ValueString(), plan.SlaProfileID); err != nil {
 			resp.Diagnostics.AddError("Error updating SLA profile on synthetic monitor", err.Error())
 			return
 		}
@@ -460,11 +479,11 @@ func (r *syntheticMonitorResource) Delete(ctx context.Context, req resource.Dele
 	}
 
 	path := r.client.Tenantf("/monitoring", "/monitors/synthetic/%s", state.ID.ValueString())
-	if err := r.client.Delete(ctx, path); err != nil && !client.IsNotFound(err) {
+	if err := r.client.DeleteManaged(ctx, path, monitorAddress("synthetic")); err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting synthetic monitor", err.Error())
 	}
 }
 
 func (r *syntheticMonitorResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	importByID(ctx, req, resp)
+	importManagedMonitor(ctx, r.client, "synthetic", req, resp)
 }

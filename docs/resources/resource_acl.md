@@ -51,7 +51,7 @@ resource "watchpoint_resource_acl" "contractor_status_page" {
 ### Required
 
 - `patterns` (Set of String) The resources this subject may reach, as the complete set. Each entry is a resource ID, a prefix glob such as `mon_payments-*`, or `*` for every resource of the kind. Matching is case-insensitive. Removing an entry revokes it on the next apply.
-- `resource_kind` (String) Kind of resource being narrowed: `monitor`, `dashboard`, `status_page`, `rum_site`. Each kind is narrowed independently, so granting monitors says nothing about dashboards. Changing it replaces the grant.
+- `resource_kind` (String) Kind of resource being narrowed: `monitor`, `dashboard`, `status_page`, `rum_site`, `environment`. Each kind is narrowed independently, so granting monitors says nothing about dashboards. Changing it replaces the grant.
 
 ### Optional
 

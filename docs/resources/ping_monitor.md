@@ -33,6 +33,7 @@ resource "watchpoint_ping_monitor" "example" {
 
 - `alert_profile_id` (String) Profile that controls notification channels and routing.
 - `check_interval_seconds` (Number) Seconds between checks. Defaults to `300`. Plans cap the minimum.
+- `environment_id` (String) Environment the monitor belongs to (a `watchpoint_environment` id). When omitted, a new monitor joins the tenant's default environment and an existing one keeps its environment. Reads return the effective environment, so a monitor that follows the default shows the default's id.
 - `group_id` (String) Monitor group this monitor belongs to.
 - `location_profile_id` (String) Profile that controls which regions run the check.
 - `max_latency_ms` (Number) Maximum acceptable average latency in milliseconds. Defaults to `500`.

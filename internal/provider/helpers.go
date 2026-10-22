@@ -85,7 +85,7 @@ func slaIsSet(v types.String) bool {
 	return !v.IsNull() && !v.IsUnknown() && v.ValueString() != ""
 }
 
-func applySlaProfile(ctx context.Context, c *client.Client, monitorID string, sla types.String) error {
+func applySlaProfile(ctx context.Context, c *client.Client, address, monitorID string, sla types.String) error {
 	var v *string
 	if slaIsSet(sla) {
 		s := sla.ValueString()
@@ -94,7 +94,7 @@ func applySlaProfile(ctx context.Context, c *client.Client, monitorID string, sl
 	body := struct {
 		SlaProfileID *string `json:"slaProfileId"`
 	}{SlaProfileID: v}
-	return c.Put(ctx, c.Tenantf("/monitoring", "/monitors/%s/sla-profile", monitorID), body, nil)
+	return c.PutManaged(ctx, c.Tenantf("/monitoring", "/monitors/%s/sla-profile", monitorID), body, nil, address)
 }
 
 // ---- Conversion helpers: framework types -> Go pointers (for JSON bodies) ----

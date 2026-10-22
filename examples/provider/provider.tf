@@ -11,6 +11,10 @@ terraform {
 provider "watchpoint" {
   api_key   = var.watchpoint_api_key
   tenant_id = var.watchpoint_tenant_id
+
+  # Recorded on every monitor this configuration manages. Defaults to
+  # TF_WORKSPACE, else "default".
+  workspace = "production"
 }
 
 variable "watchpoint_api_key" {

@@ -37,6 +37,7 @@ resource "watchpoint_domain_monitor" "primary" {
 - `alert_on_registrar_change` (Boolean) Warn when the registrar changes. Defaults to `true`.
 - `alert_profile_id` (String) Profile that controls notification channels and routing.
 - `check_interval_seconds` (Number) Seconds between checks. Plans cap the minimum.
+- `environment_id` (String) Environment the monitor belongs to (a `watchpoint_environment` id). When omitted, a new monitor joins the tenant's default environment and an existing one keeps its environment. Reads return the effective environment, so a monitor that follows the default shows the default's id.
 - `expiry_critical_days` (Number) Go critical within this many days. Must not exceed `expiry_warning_days`. Defaults to `7`.
 - `expiry_warning_days` (Number) Warn when the registration expires within this many days. Defaults to `30`.
 - `group_id` (String) Monitor group this monitor belongs to.

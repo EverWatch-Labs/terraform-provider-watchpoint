@@ -25,6 +25,10 @@ terraform {
 provider "watchpoint" {
   api_key   = var.watchpoint_api_key
   tenant_id = var.watchpoint_tenant_id
+
+  # Recorded on every monitor this configuration manages. Defaults to
+  # TF_WORKSPACE, else "default".
+  workspace = "production"
 }
 
 variable "watchpoint_api_key" {
@@ -45,3 +49,4 @@ variable "watchpoint_tenant_id" {
 - `api_key` (String, Sensitive) Watchpoint API key (the `X-API-Key` value, e.g. `wp_live_...`). May also be set via the `WATCHPOINT_API_KEY` environment variable. The key is shown only once when created under Settings → API Keys.
 - `base_url` (String) API base URL including the version segment. Defaults to `https://api.everwatch-labs.io/api/v1`. May also be set via the `WATCHPOINT_BASE_URL` environment variable.
 - `tenant_id` (String) Your organization (tenant) ID. All resources are scoped to this tenant. May also be set via the `WATCHPOINT_TENANT_ID` environment variable.
+- `workspace` (String) Workspace name recorded on every monitor this provider creates or updates, shown in Watchpoint as "Managed by Terraform (workspace X)". Defaults to the `TF_WORKSPACE` environment variable, else `default`.

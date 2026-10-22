@@ -38,6 +38,7 @@ type scheduledReportModel struct {
 	DashboardID     types.String `tfsdk:"dashboard_id"`
 	Schedule        types.String `tfsdk:"schedule"`
 	Recipients      types.Set    `tfsdk:"recipients"`
+	EnvironmentIDs  types.Set    `tfsdk:"environment_ids"`
 	TimeRange       types.String `tfsdk:"time_range"`
 	SglQuery        types.String `tfsdk:"sgl_query"`
 	LastGeneratedAt types.String `tfsdk:"last_generated_at"`
@@ -55,6 +56,7 @@ type scheduledReportCreateBody struct {
 	DashboardID     *string `json:"dashboardId,omitempty"`
 	Schedule        *string `json:"schedule,omitempty"`
 	RecipientEmails *string `json:"recipientEmails,omitempty"`
+	EnvironmentIDs  *string `json:"environmentIds,omitempty"`
 	TimeRange       *string `json:"timeRange,omitempty"`
 	SglQuery        *string `json:"sglQuery,omitempty"`
 }
@@ -65,6 +67,7 @@ type scheduledReportUpdateBody struct {
 	Name            *string `json:"name,omitempty"`
 	Schedule        *string `json:"schedule,omitempty"`
 	RecipientEmails *string `json:"recipientEmails,omitempty"`
+	EnvironmentIDs  *string `json:"environmentIds,omitempty"`
 	TimeRange       *string `json:"timeRange,omitempty"`
 	SglQuery        *string `json:"sglQuery,omitempty"`
 }
@@ -77,6 +80,7 @@ type scheduledReportResponse struct {
 	DashboardID     *string `json:"dashboardId"`
 	Schedule        string  `json:"schedule"`
 	RecipientEmails *string `json:"recipientEmails"`
+	EnvironmentIDs  *string `json:"environmentIds"`
 	TimeRange       string  `json:"timeRange"`
 	SglQuery        *string `json:"sglQuery"`
 	LastGeneratedAt *string `json:"lastGeneratedAt"`
@@ -119,6 +123,11 @@ func (r *scheduledReportResource) Schema(_ context.Context, _ resource.SchemaReq
 				Computed: true,
 				Default:  stringdefault.StaticString("None"),
 			},
+			"environment_ids": schema.SetAttribute{
+				MarkdownDescription: "Environments (`watchpoint_environment` ids) whose monitors the report includes. Omit for every environment. Unordered.",
+				Optional:            true,
+				ElementType:         types.StringType,
+			},
 			"recipients": schema.SetAttribute{
 				MarkdownDescription: "Email addresses the rendered report is sent to. Unordered.",
 				Optional:            true,
@@ -157,6 +166,7 @@ func (m *scheduledReportModel) toCreateBody(ctx context.Context, diags *diagSink
 		DashboardID:     strPtr(m.DashboardID),
 		Schedule:        strPtr(m.Schedule),
 		RecipientEmails: csvPtrFromSet(ctx, m.Recipients, diags.d),
+		EnvironmentIDs:  csvPtrFromSet(ctx, m.EnvironmentIDs, diags.d),
 		TimeRange:       strPtr(m.TimeRange),
 		SglQuery:        strPtr(m.SglQuery),
 	}
@@ -167,6 +177,7 @@ func (m *scheduledReportModel) toUpdateBody(ctx context.Context, diags *diagSink
 		Name:            strPtr(m.Name),
 		Schedule:        strPtr(m.Schedule),
 		RecipientEmails: csvPtrFromSet(ctx, m.Recipients, diags.d),
+		EnvironmentIDs:  csvPtrClearing(ctx, m.EnvironmentIDs, diags.d),
 		TimeRange:       strPtr(m.TimeRange),
 		SglQuery:        strPtr(m.SglQuery),
 	}
@@ -179,6 +190,7 @@ func (m *scheduledReportModel) applyResponse(ctx context.Context, resp *schedule
 	m.DashboardID = strFromPtr(resp.DashboardID)
 	m.Schedule = types.StringValue(resp.Schedule)
 	m.Recipients = setFromCSVPtr(ctx, resp.RecipientEmails, diags.d)
+	m.EnvironmentIDs = setFromCSVPtr(ctx, resp.EnvironmentIDs, diags.d)
 	m.TimeRange = types.StringValue(resp.TimeRange)
 	m.SglQuery = strFromPtr(resp.SglQuery)
 	m.LastGeneratedAt = strFromPtr(resp.LastGeneratedAt)

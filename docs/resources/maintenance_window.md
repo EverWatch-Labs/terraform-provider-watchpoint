@@ -39,6 +39,7 @@ resource "watchpoint_maintenance_window" "example" {
 ### Optional
 
 - `description` (String) Free-form description.
+- `environment_ids` (Set of String) Environments (`watchpoint_environment` ids) this window is limited to: it only covers monitors whose effective environment is listed. Omit to cover every environment. Unordered.
 - `group_ids` (Set of String) Monitor group IDs this window applies to. Unordered.
 - `is_recurring` (Boolean) Whether this is a recurring window. Defaults to `false`.
 - `monitor_ids` (Set of String) Monitor IDs this window applies to. Unordered.

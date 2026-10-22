@@ -36,6 +36,7 @@ resource "watchpoint_udp_monitor" "resolver" {
 
 - `alert_profile_id` (String) Profile that controls notification channels and routing.
 - `check_interval_seconds` (Number) Seconds between checks. Plans cap the minimum.
+- `environment_id` (String) Environment the monitor belongs to (a `watchpoint_environment` id). When omitted, a new monitor joins the tenant's default environment and an existing one keeps its environment. Reads return the effective environment, so a monitor that follows the default shows the default's id.
 - `expect_contains` (String) Substring the reply must contain. With no expectation a silent server passes, since UDP has no handshake to fail.
 - `expect_regex` (String) Regular expression the reply must match.
 - `group_id` (String) Monitor group this monitor belongs to.

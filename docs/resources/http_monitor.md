@@ -40,6 +40,9 @@ resource "watchpoint_http_monitor" "example" {
 - `basic_auth_user` (String) HTTP Basic auth username.
 - `bearer_token` (String, Sensitive) Bearer token sent in the Authorization header. Write-only: the API never returns it, so it is not refreshed on read.
 - `check_interval_seconds` (Number) Seconds between checks. Defaults to `300`. Plans cap the minimum.
+- `content_change_mode` (String) Content change detection: `off`, `record` (store a snapshot when the normalized body changes) or `alert` (also raise a Warning until the change is accepted in the portal). Defaults to `off`. Turning it on requires the content change detection feature.
+- `content_ignore_regex` (String) Regular expression whose matches are removed before content is compared, for timestamps, nonces and similar noise. RE2 subset: no backreferences or lookaround.
+- `environment_id` (String) Environment the monitor belongs to (a `watchpoint_environment` id). When omitted, a new monitor joins the tenant's default environment and an existing one keeps its environment. Reads return the effective environment, so a monitor that follows the default shows the default's id.
 - `expected_body_contains` (String) Substring that must appear in the response body for the check to pass.
 - `expected_body_regex` (String) Regex the response body must match.
 - `expected_header_contains` (String) Substring that must appear in the response headers.

@@ -36,6 +36,7 @@ resource "watchpoint_dns_monitor" "example" {
 - `alert_profile_id` (String) Profile that controls notification channels and routing.
 - `check_interval_seconds` (Number) Seconds between checks. Defaults to `300`. Plans cap the minimum.
 - `compare_nameservers` (Boolean) Query every authoritative nameserver of the zone directly and warn when their answers disagree. Hosted locations only. Defaults to `false`.
+- `environment_id` (String) Environment the monitor belongs to (a `watchpoint_environment` id). When omitted, a new monitor joins the tenant's default environment and an existing one keeps its environment. Reads return the effective environment, so a monitor that follows the default shows the default's id.
 - `expected_values` (String) Comma-separated expected record values; a mismatch fails the check.
 - `group_id` (String) Monitor group this monitor belongs to.
 - `location_profile_id` (String) Profile that controls which regions run the check.
