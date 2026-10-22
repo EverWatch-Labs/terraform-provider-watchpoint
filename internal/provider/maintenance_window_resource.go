@@ -46,6 +46,7 @@ type maintenanceWindowModel struct {
 	RecurrenceEndDate types.String `tfsdk:"recurrence_end_date"`
 	MonitorIDs        types.Set    `tfsdk:"monitor_ids"`
 	GroupIDs          types.Set    `tfsdk:"group_ids"`
+	EnvironmentIDs    types.Set    `tfsdk:"environment_ids"`
 	NotifyOnStart     types.Bool   `tfsdk:"notify_on_start"`
 	NotifyOnEnd       types.Bool   `tfsdk:"notify_on_end"`
 	Status            types.String `tfsdk:"status"`
@@ -73,6 +74,7 @@ type maintenanceWindowBody struct {
 	RecurrenceEndDate *string `json:"recurrenceEndDate,omitempty"`
 	MonitorIDs        *string `json:"monitorIds,omitempty"`
 	GroupIDs          *string `json:"groupIds,omitempty"`
+	EnvironmentIDs    *string `json:"environmentIds,omitempty"`
 	NotifyOnStart     *bool   `json:"notifyOnStart,omitempty"`
 	NotifyOnEnd       *bool   `json:"notifyOnEnd,omitempty"`
 }
@@ -93,6 +95,7 @@ type maintenanceWindowResponse struct {
 	RecurrenceEndDate *string `json:"recurrenceEndDate"`
 	MonitorIDs        *string `json:"monitorIds"`
 	GroupIDs          *string `json:"groupIds"`
+	EnvironmentIDs    *string `json:"environmentIds"`
 	NotifyOnStart     bool    `json:"notifyOnStart"`
 	NotifyOnEnd       bool    `json:"notifyOnEnd"`
 	Status            string  `json:"status"`
@@ -184,6 +187,11 @@ func (r *maintenanceWindowResource) Schema(_ context.Context, _ resource.SchemaR
 				Optional:            true,
 				ElementType:         types.StringType,
 			},
+			"environment_ids": schema.SetAttribute{
+				MarkdownDescription: "Environments (`watchpoint_environment` ids) this window is limited to: it only covers monitors whose effective environment is listed. Omit to cover every environment. Unordered.",
+				Optional:            true,
+				ElementType:         types.StringType,
+			},
 			"notify_on_start": schema.BoolAttribute{
 				MarkdownDescription: "Send a notification when the window starts. Defaults to `true`.",
 				Optional:            true,
@@ -228,6 +236,7 @@ func (m *maintenanceWindowModel) toBody(ctx context.Context, diags *diagSink) *m
 		RecurrenceEndDate: strPtr(m.RecurrenceEndDate),
 		MonitorIDs:        csvPtrFromSet(ctx, m.MonitorIDs, diags.d),
 		GroupIDs:          csvPtrFromSet(ctx, m.GroupIDs, diags.d),
+		EnvironmentIDs:    csvPtrClearing(ctx, m.EnvironmentIDs, diags.d),
 		NotifyOnStart:     boolPtr(m.NotifyOnStart),
 		NotifyOnEnd:       boolPtr(m.NotifyOnEnd),
 	}
@@ -249,6 +258,7 @@ func (m *maintenanceWindowModel) applyResponse(ctx context.Context, resp *mainte
 	m.RecurrenceEndDate = strFromPtr(resp.RecurrenceEndDate)
 	m.MonitorIDs = setFromCSVPtr(ctx, resp.MonitorIDs, diags.d)
 	m.GroupIDs = setFromCSVPtr(ctx, resp.GroupIDs, diags.d)
+	m.EnvironmentIDs = setFromCSVPtr(ctx, resp.EnvironmentIDs, diags.d)
 	m.NotifyOnStart = types.BoolValue(resp.NotifyOnStart)
 	m.NotifyOnEnd = types.BoolValue(resp.NotifyOnEnd)
 	m.Status = types.StringValue(resp.Status)

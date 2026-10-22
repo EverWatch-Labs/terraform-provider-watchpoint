@@ -51,6 +51,7 @@ type sslMonitorModel struct {
 	SlaProfileID            types.String `tfsdk:"sla_profile_id"`
 	GroupID                 types.String `tfsdk:"group_id"`
 	Tags                    types.Set    `tfsdk:"tags"`
+	EnvironmentID           types.String `tfsdk:"environment_id"`
 	Status                  types.String `tfsdk:"status"`
 	CreatedAt               types.String `tfsdk:"created_at"`
 }
@@ -75,6 +76,7 @@ type sslMonitorCreateBody struct {
 	AlertProfileID          *string `json:"alertProfileId,omitempty"`
 	GroupID                 *string `json:"groupId,omitempty"`
 	Tags                    *string `json:"tags,omitempty"`
+	EnvironmentID           *string `json:"environmentId,omitempty"`
 }
 
 // sslMonitorUpdateBody mirrors the PATCH DTO; pointers omit unchanged fields.
@@ -101,6 +103,7 @@ type sslMonitorResponse struct {
 	SlaProfileID            *string `json:"slaProfileId"`
 	GroupID                 *string `json:"groupId"`
 	Tags                    *string `json:"tags"`
+	EnvironmentID           *string `json:"environmentId,omitempty"`
 	CreatedAt               string  `json:"createdAt"`
 }
 
@@ -206,6 +209,7 @@ func (r *sslMonitorResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				MarkdownDescription: "Monitor group this monitor belongs to.",
 				Optional:            true,
 			},
+			"environment_id": environmentIDAttribute(),
 			"tags": schema.SetAttribute{
 				MarkdownDescription: "Free-form tags surfaced in filters and SGL queries (`attributes.tags`). Unordered.",
 				Optional:            true,
@@ -242,6 +246,7 @@ func (m *sslMonitorModel) toCreateBody(ctx context.Context, diags *diagSink) *ss
 		AlertProfileID:          strPtr(m.AlertProfileID),
 		GroupID:                 strPtr(m.GroupID),
 		Tags:                    csvPtrFromSet(ctx, m.Tags, diags.d),
+		EnvironmentID:           strPtr(m.EnvironmentID),
 	}
 }
 
@@ -266,6 +271,7 @@ func (m *sslMonitorModel) applyResponse(ctx context.Context, resp *sslMonitorRes
 	m.SlaProfileID = strFromPtr(resp.SlaProfileID)
 	m.GroupID = strFromPtr(resp.GroupID)
 	m.Tags = setFromCSVPtr(ctx, resp.Tags, diags.d)
+	m.EnvironmentID = strFromPtr(resp.EnvironmentID)
 	m.Status = types.StringValue(resp.Status)
 	m.CreatedAt = types.StringValue(resp.CreatedAt)
 }
@@ -285,7 +291,7 @@ func (r *sslMonitorResource) Create(ctx context.Context, req resource.CreateRequ
 
 	var created idNameResponse
 	path := r.client.Tenantf("/monitoring", "/monitors/ssl")
-	if err := r.client.Post(ctx, path, body, &created); err != nil {
+	if err := r.client.PostManaged(ctx, path, body, &created, monitorAddress("ssl")); err != nil {
 		resp.Diagnostics.AddError("Error creating SSL monitor", err.Error())
 		return
 	}
@@ -293,7 +299,7 @@ func (r *sslMonitorResource) Create(ctx context.Context, req resource.CreateRequ
 	// Re-read to populate all computed fields from the canonical record.
 	var got sslMonitorResponse
 	if slaIsSet(plan.SlaProfileID) {
-		if err := applySlaProfile(ctx, r.client, created.ID, plan.SlaProfileID); err != nil {
+		if err := applySlaProfile(ctx, r.client, monitorAddress("ssl"), created.ID, plan.SlaProfileID); err != nil {
 			resp.Diagnostics.AddError("Error attaching SLA profile to SSL monitor", err.Error())
 			return
 		}
@@ -346,7 +352,7 @@ func (r *sslMonitorResource) Update(ctx context.Context, req resource.UpdateRequ
 	}
 
 	path := r.client.Tenantf("/monitoring", "/monitors/ssl/%s", plan.ID.ValueString())
-	if err := r.client.Patch(ctx, path, body, nil); err != nil {
+	if err := r.client.PatchManaged(ctx, path, body, nil, monitorAddress("ssl")); err != nil {
 		resp.Diagnostics.AddError("Error updating SSL monitor", err.Error())
 		return
 	}
@@ -354,7 +360,7 @@ func (r *sslMonitorResource) Update(ctx context.Context, req resource.UpdateRequ
 	var priorState sslMonitorModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &priorState)...)
 	if !resp.Diagnostics.HasError() && !plan.SlaProfileID.Equal(priorState.SlaProfileID) {
-		if err := applySlaProfile(ctx, r.client, plan.ID.ValueString(), plan.SlaProfileID); err != nil {
+		if err := applySlaProfile(ctx, r.client, monitorAddress("ssl"), plan.ID.ValueString(), plan.SlaProfileID); err != nil {
 			resp.Diagnostics.AddError("Error updating SLA profile on SSL monitor", err.Error())
 			return
 		}
@@ -377,11 +383,11 @@ func (r *sslMonitorResource) Delete(ctx context.Context, req resource.DeleteRequ
 	}
 
 	path := r.client.Tenantf("/monitoring", "/monitors/ssl/%s", state.ID.ValueString())
-	if err := r.client.Delete(ctx, path); err != nil && !client.IsNotFound(err) {
+	if err := r.client.DeleteManaged(ctx, path, monitorAddress("ssl")); err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting SSL monitor", err.Error())
 	}
 }
 
 func (r *sslMonitorResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	importByID(ctx, req, resp)
+	importManagedMonitor(ctx, r.client, "ssl", req, resp)
 }

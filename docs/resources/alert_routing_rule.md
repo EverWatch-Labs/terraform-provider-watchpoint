@@ -101,7 +101,7 @@ resource "watchpoint_alert_routing_rule" "after_hours_critical" {
 
 Required:
 
-- `condition_type` (String) What to match on. One of `MonitorTag`, `MonitorGroup`, `MonitorType`, `Severity`, `ServiceName`, `TimeWindow`.
+- `condition_type` (String) What to match on. One of `MonitorTag`, `MonitorGroup`, `MonitorType`, `Severity`, `ServiceName`, `TimeWindow`, `Environment` (the monitor's environment key, such as `production`).
 
 Optional:
 

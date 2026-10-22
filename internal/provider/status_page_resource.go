@@ -6,10 +6,12 @@ import (
 	"unicode"
 
 	"github.com/everwatch-labs/terraform-provider-watchpoint/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -41,7 +43,7 @@ var statusPageVisibilities = []string{"Public", "PasswordProtected", "EmailDomai
 // statusPageLanguages mirrors StatusPagesController.SupportedLanguages, which is
 // the catalogue the public viewer actually ships strings for. Anything else is a
 // 400, so the list is pinned here and grows when the viewer's does.
-var statusPageLanguages = []string{"en", "es", "de"}
+var statusPageLanguages = []string{"en", "de", "fr", "es", "pt-BR", "ja", "nl"}
 
 var (
 	_ resource.Resource                = (*statusPageResource)(nil)
@@ -73,6 +75,7 @@ type statusPageModel struct {
 	FooterText          types.String `tfsdk:"footer_text"`
 	FooterHTML          types.String `tfsdk:"footer_html"`
 	DefaultLanguage     types.String `tfsdk:"default_language"`
+	EnabledLanguages    types.Set    `tfsdk:"enabled_languages"`
 	AccessPassword      types.String `tfsdk:"access_password"`
 	HasAccessPassword   types.Bool   `tfsdk:"has_access_password"`
 	AllowedEmailDomains types.Set    `tfsdk:"allowed_email_domains"`
@@ -111,11 +114,12 @@ type statusPageUpdateBody struct {
 	// told to clear the setting, and nil would silently mean "leave unchanged",
 	// which makes removing the attribute from config a no-op that then fails the
 	// apply because the response still carries the old value.
-	DefaultLanguage     *string `json:"defaultLanguage,omitempty"`
-	Visibility          *string `json:"visibility,omitempty"`
-	AccessPassword      *string `json:"accessPassword,omitempty"`
-	AllowedEmailDomains *string `json:"allowedEmailDomains,omitempty"`
-	CustomCSS           *string `json:"customCss,omitempty"`
+	DefaultLanguage     *string  `json:"defaultLanguage,omitempty"`
+	EnabledLanguages    []string `json:"enabledLanguages,omitempty"`
+	Visibility          *string  `json:"visibility,omitempty"`
+	AccessPassword      *string  `json:"accessPassword,omitempty"`
+	AllowedEmailDomains *string  `json:"allowedEmailDomains,omitempty"`
+	CustomCSS           *string  `json:"customCss,omitempty"`
 }
 
 // statusPageBranding mirrors the nested `branding` object in the Detail response.
@@ -140,6 +144,7 @@ type statusPageResponse struct {
 	PrimaryDashboardID  *string             `json:"primaryDashboardId"`
 	Branding            *statusPageBranding `json:"branding"`
 	DefaultLanguage     *string             `json:"defaultLanguage"`
+	EnabledLanguages    []string            `json:"enabledLanguages"`
 	HasAccessPassword   bool                `json:"hasAccessPassword"`
 	AllowedEmailDomains *string             `json:"allowedEmailDomains"`
 	CustomCSS           *string             `json:"customCss"`
@@ -233,6 +238,16 @@ func (r *statusPageResource) Schema(_ context.Context, _ resource.SchemaRequest,
 					strings.Join(statusPageLanguages, "`, `") + "`. Omit to follow the visitor's browser.",
 				Optional:   true,
 				Validators: []validator.String{stringvalidator.OneOf(statusPageLanguages...)},
+			},
+			"enabled_languages": schema.SetAttribute{
+				MarkdownDescription: "Languages the public viewer offers in its language picker. Must include " +
+					"`default_language` when that is set. Omit to keep what the page has; reads return every " +
+					"language when none are restricted. Restricting requires the status page localization feature.",
+				Optional:      true,
+				Computed:      true,
+				ElementType:   types.StringType,
+				PlanModifiers: []planmodifier.Set{setplanmodifier.UseStateForUnknown()},
+				Validators:    []validator.Set{setvalidator.SizeAtLeast(1), setvalidator.ValueStringsAre(stringvalidator.OneOf(statusPageLanguages...))},
 			},
 			"access_password": schema.StringAttribute{
 				MarkdownDescription: "Shared password visitors must enter when `visibility` is " +
@@ -333,6 +348,7 @@ func (m *statusPageModel) toUpdateBody(ctx context.Context, diags *diagSink) *st
 	domains := strings.Join(normalizeEmailDomains(stringSliceFromSet(ctx, m.AllowedEmailDomains, diags.d)), ",")
 	return &statusPageUpdateBody{
 		DefaultLanguage:     strPtrClearing(m.DefaultLanguage),
+		EnabledLanguages:    stringSliceFromSet(ctx, m.EnabledLanguages, diags.d),
 		Visibility:          strPtr(m.Visibility),
 		AccessPassword:      strPtr(m.AccessPassword),
 		AllowedEmailDomains: &domains,
@@ -378,6 +394,7 @@ func (m *statusPageModel) applyResponse(ctx context.Context, resp *statusPageRes
 		m.FooterHTML = types.StringNull()
 	}
 	m.DefaultLanguage = strFromPtr(resp.DefaultLanguage)
+	m.EnabledLanguages = setFromStringSlice(ctx, resp.EnabledLanguages, diags.d)
 	m.HasAccessPassword = types.BoolValue(resp.HasAccessPassword)
 	// Keep the configured spelling when the stored list is the same set of
 	// domains: the API lower-cases and strips "@", and writing that normalised

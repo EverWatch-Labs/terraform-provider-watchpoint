@@ -28,6 +28,7 @@ type Client struct {
 	tenantID   string
 	httpClient *http.Client
 	userAgent  string
+	workspace  string
 }
 
 // Config configures a Client.
@@ -36,6 +37,8 @@ type Config struct {
 	APIKey    string
 	TenantID  string
 	UserAgent string
+	// Workspace is sent on managed writes; empty means "default".
+	Workspace string
 	// HTTPClient is optional; a sane default is used when nil.
 	HTTPClient *http.Client
 }
@@ -54,17 +57,25 @@ func New(cfg Config) *Client {
 	if ua == "" {
 		ua = "terraform-provider-watchpoint"
 	}
+	ws := strings.TrimSpace(cfg.Workspace)
+	if ws == "" {
+		ws = "default"
+	}
 	return &Client{
 		baseURL:    base,
 		apiKey:     cfg.APIKey,
 		tenantID:   cfg.TenantID,
 		httpClient: hc,
 		userAgent:  ua,
+		workspace:  ws,
 	}
 }
 
 // TenantID returns the tenant this client is scoped to.
 func (c *Client) TenantID() string { return c.tenantID }
+
+// Workspace returns the Terraform workspace sent on managed writes.
+func (c *Client) Workspace() string { return c.workspace }
 
 // APIError is returned for any non-2xx response.
 type APIError struct {
@@ -110,6 +121,27 @@ func (c *Client) Tenantf(servicePrefix, format string, args ...any) string {
 // non-nil and the response carries a JSON body, it is decoded into out. query,
 // when non-nil, is appended as the query string.
 func (c *Client) Do(ctx context.Context, method, path string, query url.Values, body, out any) error {
+	return c.do(ctx, method, path, query, body, out, nil)
+}
+
+// Managed-write headers. The server only honours them on API-key calls.
+const (
+	HeaderManagedBy = "X-Watchpoint-Managed-By"
+	HeaderWorkspace = "X-Watchpoint-Terraform-Workspace"
+	HeaderAddress   = "X-Watchpoint-Terraform-Address"
+)
+
+// DoManaged is Do plus the headers that mark a monitor as managed by Terraform.
+// address is the resource type name (Terraform does not pass addresses to providers).
+func (c *Client) DoManaged(ctx context.Context, method, path string, query url.Values, body, out any, address string) error {
+	return c.do(ctx, method, path, query, body, out, map[string]string{
+		HeaderManagedBy: "terraform",
+		HeaderWorkspace: c.workspace,
+		HeaderAddress:   address,
+	})
+}
+
+func (c *Client) do(ctx context.Context, method, path string, query url.Values, body, out any, extra map[string]string) error {
 	var reader io.Reader
 	if body != nil {
 		buf, err := json.Marshal(body)
@@ -133,6 +165,9 @@ func (c *Client) Do(ctx context.Context, method, path string, query url.Values, 
 	req.Header.Set("User-Agent", c.userAgent)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
+	}
+	for k, v := range extra {
+		req.Header.Set(k, v)
 	}
 
 	resp, err := c.httpClient.Do(req)
@@ -184,6 +219,26 @@ func (c *Client) Put(ctx context.Context, path string, body, out any) error {
 // Delete is a convenience wrapper for DELETE requests.
 func (c *Client) Delete(ctx context.Context, path string) error {
 	return c.Do(ctx, http.MethodDelete, path, nil, nil, nil)
+}
+
+// PostManaged is Post with the managed-by-Terraform headers.
+func (c *Client) PostManaged(ctx context.Context, path string, body, out any, address string) error {
+	return c.DoManaged(ctx, http.MethodPost, path, nil, body, out, address)
+}
+
+// PatchManaged is Patch with the managed-by-Terraform headers.
+func (c *Client) PatchManaged(ctx context.Context, path string, body, out any, address string) error {
+	return c.DoManaged(ctx, http.MethodPatch, path, nil, body, out, address)
+}
+
+// PutManaged is Put with the managed-by-Terraform headers.
+func (c *Client) PutManaged(ctx context.Context, path string, body, out any, address string) error {
+	return c.DoManaged(ctx, http.MethodPut, path, nil, body, out, address)
+}
+
+// DeleteManaged is Delete with the managed-by-Terraform headers.
+func (c *Client) DeleteManaged(ctx context.Context, path, address string) error {
+	return c.DoManaged(ctx, http.MethodDelete, path, nil, nil, nil, address)
 }
 
 // extractMessage tries to pull a human-readable message out of a JSON error

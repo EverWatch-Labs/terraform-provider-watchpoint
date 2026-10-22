@@ -32,6 +32,7 @@ resource "watchpoint_scheduled_report" "example" {
 ### Optional
 
 - `dashboard_id` (String) Dashboard rendered into this report. Leave unset for an SGL/audit CSV export report (see `sgl_query`). Cannot be changed after creation.
+- `environment_ids` (Set of String) Environments (`watchpoint_environment` ids) whose monitors the report includes. Omit for every environment. Unordered.
 - `recipients` (Set of String) Email addresses the rendered report is sent to. Unordered.
 - `schedule` (String) Delivery cadence: `None`, `Daily`, `Weekly`, or `Monthly`. Defaults to `None` (manual-only). Scheduled reports run at 08:00 UTC.
 - `sgl_query` (String) When set, the report is an SGL/audit-log CSV export run over `time_range` instead of a dashboard render. Mutually exclusive with `dashboard_id` in practice.

@@ -47,8 +47,9 @@ resource "watchpoint_status_page" "internal" {
 - `access_password` (String, Sensitive) Shared password visitors must enter when `visibility` is `PasswordProtected`. Write-only: the API stores only a hash and never returns it, so a password changed outside Terraform is not detected. Removing it from configuration clears the stored password.
 - `allowed_email_domains` (Set of String) Email domains whose owners may view the page when `visibility` is `EmailDomainRestricted`, for example `acme.com`. Unordered. Values are stored lower-cased with any leading `@` stripped.
 - `custom_css` (String) Custom stylesheet for the public page (20000 characters max). The API sanitizes it and scopes every rule under the page root: `@import`, remote `url()`, `expression()` and similar are stripped. The configured text is kept in state, so sanitization does not show as drift. Requires the `status_custom_css` feature (Scale); removing it is always allowed.
-- `default_language` (String) Language the public viewer renders in for every visitor: `en`, `es`, `de`. Omit to follow the visitor's browser.
+- `default_language` (String) Language the public viewer renders in for every visitor: `en`, `de`, `fr`, `es`, `pt-BR`, `ja`, `nl`. Omit to follow the visitor's browser.
 - `description` (String) Optional page description.
+- `enabled_languages` (Set of String) Languages the public viewer offers in its language picker. Must include `default_language` when that is set. Omit to keep what the page has; reads return every language when none are restricted. Restricting requires the status page localization feature.
 - `favicon_url` (String) Branding: favicon URL.
 - `footer_html` (String) Branding: HTML footer (sanitized server-side to a strict tag/attribute whitelist).
 - `footer_text` (String) Branding: plain-text footer.

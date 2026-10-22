@@ -47,6 +47,7 @@ type tcpMonitorModel struct {
 	SlaProfileID         types.String `tfsdk:"sla_profile_id"`
 	GroupID              types.String `tfsdk:"group_id"`
 	Tags                 types.Set    `tfsdk:"tags"`
+	EnvironmentID        types.String `tfsdk:"environment_id"`
 	Status               types.String `tfsdk:"status"`
 	CreatedAt            types.String `tfsdk:"created_at"`
 }
@@ -67,6 +68,7 @@ type tcpMonitorCreateBody struct {
 	AlertProfileID       *string `json:"alertProfileId,omitempty"`
 	GroupID              *string `json:"groupId,omitempty"`
 	Tags                 *string `json:"tags,omitempty"`
+	EnvironmentID        *string `json:"environmentId,omitempty"`
 }
 
 // tcpMonitorUpdateBody mirrors the PATCH DTO; pointers omit unchanged fields.
@@ -89,6 +91,7 @@ type tcpMonitorResponse struct {
 	SlaProfileID         *string `json:"slaProfileId"`
 	GroupID              *string `json:"groupId"`
 	Tags                 *string `json:"tags"`
+	EnvironmentID        *string `json:"environmentId,omitempty"`
 	CreatedAt            string  `json:"createdAt"`
 }
 
@@ -170,6 +173,7 @@ func (r *tcpMonitorResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				MarkdownDescription: "Monitor group this monitor belongs to.",
 				Optional:            true,
 			},
+			"environment_id": environmentIDAttribute(),
 			"tags": schema.SetAttribute{
 				MarkdownDescription: "Free-form tags surfaced in filters and SGL queries (`attributes.tags`). Unordered.",
 				Optional:            true,
@@ -202,6 +206,7 @@ func (m *tcpMonitorModel) toCreateBody(ctx context.Context, diags *diagSink) *tc
 		AlertProfileID:       strPtr(m.AlertProfileID),
 		GroupID:              strPtr(m.GroupID),
 		Tags:                 csvPtrFromSet(ctx, m.Tags, diags.d),
+		EnvironmentID:        strPtr(m.EnvironmentID),
 	}
 }
 
@@ -222,6 +227,7 @@ func (m *tcpMonitorModel) applyResponse(ctx context.Context, resp *tcpMonitorRes
 	m.SlaProfileID = strFromPtr(resp.SlaProfileID)
 	m.GroupID = strFromPtr(resp.GroupID)
 	m.Tags = setFromCSVPtr(ctx, resp.Tags, diags.d)
+	m.EnvironmentID = strFromPtr(resp.EnvironmentID)
 	m.Status = types.StringValue(resp.Status)
 	m.CreatedAt = types.StringValue(resp.CreatedAt)
 }
@@ -241,13 +247,13 @@ func (r *tcpMonitorResource) Create(ctx context.Context, req resource.CreateRequ
 
 	var created idNameResponse
 	path := r.client.Tenantf("/monitoring", "/monitors/tcp")
-	if err := r.client.Post(ctx, path, body, &created); err != nil {
+	if err := r.client.PostManaged(ctx, path, body, &created, monitorAddress("tcp")); err != nil {
 		resp.Diagnostics.AddError("Error creating TCP monitor", err.Error())
 		return
 	}
 
 	if slaIsSet(plan.SlaProfileID) {
-		if err := applySlaProfile(ctx, r.client, created.ID, plan.SlaProfileID); err != nil {
+		if err := applySlaProfile(ctx, r.client, monitorAddress("tcp"), created.ID, plan.SlaProfileID); err != nil {
 			resp.Diagnostics.AddError("Error attaching SLA profile to TCP monitor", err.Error())
 			return
 		}
@@ -303,7 +309,7 @@ func (r *tcpMonitorResource) Update(ctx context.Context, req resource.UpdateRequ
 	}
 
 	path := r.client.Tenantf("/monitoring", "/monitors/tcp/%s", plan.ID.ValueString())
-	if err := r.client.Patch(ctx, path, body, nil); err != nil {
+	if err := r.client.PatchManaged(ctx, path, body, nil, monitorAddress("tcp")); err != nil {
 		resp.Diagnostics.AddError("Error updating TCP monitor", err.Error())
 		return
 	}
@@ -311,7 +317,7 @@ func (r *tcpMonitorResource) Update(ctx context.Context, req resource.UpdateRequ
 	var priorState tcpMonitorModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &priorState)...)
 	if !resp.Diagnostics.HasError() && !plan.SlaProfileID.Equal(priorState.SlaProfileID) {
-		if err := applySlaProfile(ctx, r.client, plan.ID.ValueString(), plan.SlaProfileID); err != nil {
+		if err := applySlaProfile(ctx, r.client, monitorAddress("tcp"), plan.ID.ValueString(), plan.SlaProfileID); err != nil {
 			resp.Diagnostics.AddError("Error updating SLA profile on TCP monitor", err.Error())
 			return
 		}
@@ -334,11 +340,11 @@ func (r *tcpMonitorResource) Delete(ctx context.Context, req resource.DeleteRequ
 	}
 
 	path := r.client.Tenantf("/monitoring", "/monitors/tcp/%s", state.ID.ValueString())
-	if err := r.client.Delete(ctx, path); err != nil && !client.IsNotFound(err) {
+	if err := r.client.DeleteManaged(ctx, path, monitorAddress("tcp")); err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting TCP monitor", err.Error())
 	}
 }
 
 func (r *tcpMonitorResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	importByID(ctx, req, resp)
+	importManagedMonitor(ctx, r.client, "tcp", req, resp)
 }

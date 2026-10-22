@@ -222,5 +222,5 @@ func (r *domainMonitorResource) Delete(ctx context.Context, req resource.DeleteR
 }
 
 func (r *domainMonitorResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	importByID(ctx, req, resp)
+	importManagedMonitor(ctx, r.client, "domain", req, resp)
 }

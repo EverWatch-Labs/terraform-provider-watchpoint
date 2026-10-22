@@ -254,5 +254,5 @@ func (r *mailMonitorResource) Delete(ctx context.Context, req resource.DeleteReq
 }
 
 func (r *mailMonitorResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	importByID(ctx, req, resp)
+	importManagedMonitor(ctx, r.client, "mail", req, resp)
 }

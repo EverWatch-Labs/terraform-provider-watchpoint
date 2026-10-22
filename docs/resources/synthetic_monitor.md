@@ -39,8 +39,11 @@ resource "watchpoint_synthetic_monitor" "example" {
 - `capture_har` (Boolean) Capture a HAR archive of network activity. Defaults to `false`.
 - `capture_screenshot` (Boolean) Capture a screenshot on each run. Defaults to `true`.
 - `check_interval_seconds` (Number) Seconds between checks. Defaults to `900`. Plans cap the minimum.
+- `content_change_mode` (String) Content change detection: `off`, `record` (store a snapshot when the normalized body changes) or `alert` (also raise a Warning until the change is accepted in the portal). Defaults to `off`. Turning it on requires the content change detection feature.
+- `content_ignore_regex` (String) Regular expression whose matches are removed before content is compared, for timestamps, nonces and similar noise. RE2 subset: no backreferences or lookaround.
 - `disable_cache` (Boolean) Disable the browser cache for each run. Defaults to `false`.
 - `enable_visual_diff` (Boolean) Compare screenshots against a baseline and alert on visual drift. Defaults to `false`.
+- `environment_id` (String) Environment the monitor belongs to (a `watchpoint_environment` id). When omitted, a new monitor joins the tenant's default environment and an existing one keeps its environment. Reads return the effective environment, so a monitor that follows the default shows the default's id.
 - `expected_texts` (String) Comma-separated text snippets that must be present on the page.
 - `extra_headers` (String) JSON-encoded extra request headers map.
 - `group_id` (String) Monitor group this monitor belongs to.

@@ -205,5 +205,5 @@ func (r *udpMonitorResource) Delete(ctx context.Context, req resource.DeleteRequ
 }
 
 func (r *udpMonitorResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	importByID(ctx, req, resp)
+	importManagedMonitor(ctx, r.client, "udp", req, resp)
 }

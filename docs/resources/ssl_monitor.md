@@ -37,6 +37,7 @@ resource "watchpoint_ssl_monitor" "example" {
 - `check_cert_chain` (Boolean) Validate the full certificate chain. Defaults to `true`.
 - `check_interval_seconds` (Number) Seconds between checks. Defaults to `3600`. Plans cap the minimum.
 - `check_revocation` (Boolean) Check certificate revocation status (OCSP/CRL). Defaults to `false`.
+- `environment_id` (String) Environment the monitor belongs to (a `watchpoint_environment` id). When omitted, a new monitor joins the tenant's default environment and an existing one keeps its environment. Reads return the effective environment, so a monitor that follows the default shows the default's id.
 - `expected_issuer` (String) Issuer the certificate must be issued by; a mismatch fails the check.
 - `expected_subject_alt_names` (String) Comma-separated subject alternative names the certificate must include.
 - `expiry_critical_days` (Number) Days before expiry at which a critical alert is raised. Defaults to `7`.

@@ -2,9 +2,10 @@
 # `make` requirements: Go 1.24+, and (for `docs`) the tfplugindocs tool.
 
 BINARY  := terraform-provider-watchpoint
-VERSION := dev
+# Bump VERSION to release; `make release` tags v$(VERSION) and CI publishes it.
+VERSION := $(strip $(file < VERSION))
 
-.PHONY: build install fmt vet test docs clean tidy
+.PHONY: build install fmt vet test docs clean tidy release
 
 ## build: compile the provider binary into the repo root.
 build:
@@ -35,6 +36,11 @@ tidy:
 ## Requires: go install github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs@latest
 docs:
 	tfplugindocs generate --provider-name watchpoint
+
+## release: tag the current commit v$(VERSION) and push it; the ci-cd release job does the rest.
+release:
+	git tag -a v$(VERSION) -m "v$(VERSION)"
+	git push origin v$(VERSION)
 
 ## clean: remove build artifacts.
 clean:

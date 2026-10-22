@@ -60,7 +60,7 @@ var (
 
 // resourceAclKinds are the kinds ResourceAcl.GrantableKinds allows. Anything
 // else is rejected by the API with a 400 naming this same list.
-var resourceAclKinds = []string{"monitor", "dashboard", "status_page", "rum_site"}
+var resourceAclKinds = []string{"monitor", "dashboard", "status_page", "rum_site", "environment"}
 
 // NewResourceAclResource is the resource constructor wired into the provider.
 func NewResourceAclResource() resource.Resource { return &resourceAclResource{} }

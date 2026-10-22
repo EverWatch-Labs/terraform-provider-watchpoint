@@ -57,6 +57,7 @@ type heartbeatMonitorModel struct {
 	AlertProfileID        types.String `tfsdk:"alert_profile_id"`
 	GroupID               types.String `tfsdk:"group_id"`
 	Tags                  types.Set    `tfsdk:"tags"`
+	EnvironmentID         types.String `tfsdk:"environment_id"`
 	RotateTrigger         types.String `tfsdk:"rotate_trigger"`
 	PingToken             types.String `tfsdk:"ping_token"`
 	PingURL               types.String `tfsdk:"ping_url"`
@@ -81,6 +82,7 @@ type heartbeatMonitorCreateBody struct {
 	AlertProfileID        *string `json:"alertProfileId,omitempty"`
 	GroupID               *string `json:"groupId,omitempty"`
 	Tags                  *string `json:"tags,omitempty"`
+	EnvironmentID         *string `json:"environmentId,omitempty"`
 	CronExpression        *string `json:"cronExpression,omitempty"`
 	TimeZone              *string `json:"timeZone,omitempty"`
 }
@@ -98,6 +100,7 @@ type heartbeatMonitorUpdateBody struct {
 	AlertProfileID        *string `json:"alertProfileId"`
 	GroupID               *string `json:"groupId"`
 	Tags                  *string `json:"tags"`
+	EnvironmentID         *string `json:"environmentId,omitempty"`
 	CronExpression        *string `json:"cronExpression"`
 	TimeZone              *string `json:"timeZone"`
 	RotateToken           *bool   `json:"rotateToken,omitempty"`
@@ -125,6 +128,7 @@ type heartbeatMonitorResponse struct {
 	AlertProfileID        *string `json:"alertProfileId"`
 	GroupID               *string `json:"groupId"`
 	Tags                  *string `json:"tags"`
+	EnvironmentID         *string `json:"environmentId,omitempty"`
 	LastCheckAt           *string `json:"lastCheckAt"`
 	LastCheckStatus       *string `json:"lastCheckStatus"`
 	CreatedAt             string  `json:"createdAt"`
@@ -191,6 +195,7 @@ func (r *heartbeatMonitorResource) Schema(_ context.Context, _ resource.SchemaRe
 				MarkdownDescription: "Monitor group this monitor belongs to.",
 				Optional:            true,
 			},
+			"environment_id": environmentIDAttribute(),
 			"tags": schema.SetAttribute{
 				MarkdownDescription: "Free-form tags surfaced in filters and SGL queries (`attributes.tags`). Unordered.",
 				Optional:            true,
@@ -274,6 +279,7 @@ func (m *heartbeatMonitorModel) toCreateBody(ctx context.Context, diags *diagSin
 		AlertProfileID:        strPtr(m.AlertProfileID),
 		GroupID:               strPtr(m.GroupID),
 		Tags:                  csvPtrFromSet(ctx, m.Tags, diags.d),
+		EnvironmentID:         strPtr(m.EnvironmentID),
 		CronExpression:        strPtr(m.CronExpression),
 		TimeZone:              strPtr(m.TimeZone),
 	}
@@ -290,6 +296,7 @@ func (m *heartbeatMonitorModel) toUpdateBody(ctx context.Context, rotate bool, d
 		AlertProfileID:        strPtrClearing(m.AlertProfileID),
 		GroupID:               strPtrClearing(m.GroupID),
 		Tags:                  csvPtrClearing(ctx, m.Tags, diags.d),
+		EnvironmentID:         strPtr(m.EnvironmentID),
 		// "" clears the schedule back to the fixed period; null would keep it.
 		CronExpression: strPtrClearing(m.CronExpression),
 		TimeZone:       strPtrClearing(m.TimeZone),
@@ -311,6 +318,7 @@ func (m *heartbeatMonitorModel) applyResponse(ctx context.Context, resp *heartbe
 	m.AlertProfileID = strFromPtr(resp.AlertProfileID)
 	m.GroupID = strFromPtr(resp.GroupID)
 	m.Tags = setFromCSVPtr(ctx, resp.Tags, diags.d)
+	m.EnvironmentID = strFromPtr(resp.EnvironmentID)
 	m.PingToken = types.StringValue(resp.PingToken)
 	m.PingURL = types.StringValue(resp.PingURL)
 	m.SlaProfileID = strFromPtr(resp.SlaProfileID)
@@ -338,13 +346,13 @@ func (r *heartbeatMonitorResource) Create(ctx context.Context, req resource.Crea
 
 	var created heartbeatCreatedResponse
 	path := r.client.Tenantf("/monitoring", "/monitors/heartbeat")
-	if err := r.client.Post(ctx, path, body, &created); err != nil {
+	if err := r.client.PostManaged(ctx, path, body, &created, monitorAddress("heartbeat")); err != nil {
 		resp.Diagnostics.AddError("Error creating heartbeat monitor", err.Error())
 		return
 	}
 
 	if slaIsSet(plan.SlaProfileID) {
-		if err := applySlaProfile(ctx, r.client, created.ID, plan.SlaProfileID); err != nil {
+		if err := applySlaProfile(ctx, r.client, monitorAddress("heartbeat"), created.ID, plan.SlaProfileID); err != nil {
 			resp.Diagnostics.AddError("Error attaching SLA profile to heartbeat monitor", err.Error())
 			return
 		}
@@ -399,12 +407,12 @@ func (r *heartbeatMonitorResource) Update(ctx context.Context, req resource.Upda
 	}
 
 	path := r.client.Tenantf("/monitoring", "/monitors/heartbeat/%s", plan.ID.ValueString())
-	if err := r.client.Patch(ctx, path, body, nil); err != nil {
+	if err := r.client.PatchManaged(ctx, path, body, nil, monitorAddress("heartbeat")); err != nil {
 		resp.Diagnostics.AddError("Error updating heartbeat monitor", err.Error())
 		return
 	}
 	if !plan.SlaProfileID.Equal(state.SlaProfileID) {
-		if err := applySlaProfile(ctx, r.client, plan.ID.ValueString(), plan.SlaProfileID); err != nil {
+		if err := applySlaProfile(ctx, r.client, monitorAddress("heartbeat"), plan.ID.ValueString(), plan.SlaProfileID); err != nil {
 			resp.Diagnostics.AddError("Error updating SLA profile on heartbeat monitor", err.Error())
 			return
 		}
@@ -427,11 +435,11 @@ func (r *heartbeatMonitorResource) Delete(ctx context.Context, req resource.Dele
 	}
 
 	path := r.client.Tenantf("/monitoring", "/monitors/heartbeat/%s", state.ID.ValueString())
-	if err := r.client.Delete(ctx, path); err != nil && !client.IsNotFound(err) {
+	if err := r.client.DeleteManaged(ctx, path, monitorAddress("heartbeat")); err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting heartbeat monitor", err.Error())
 	}
 }
 
 func (r *heartbeatMonitorResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	importByID(ctx, req, resp)
+	importManagedMonitor(ctx, r.client, "heartbeat", req, resp)
 }

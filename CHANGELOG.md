@@ -1,6 +1,54 @@
 # Changelog
 
-## 1.1.0 (Unreleased)
+## 1.2.0 (Unreleased)
+
+FEATURES:
+
+* **New Resource:** `watchpoint_environment` - tenant environments (Monitoring,
+  `/environments`). `is_default = true` moves the default; `reassign_to` names
+  where monitors and services go when an in-use environment is destroyed.
+* **New Data Source:** `watchpoint_environment` - looks up an environment by key,
+  or `default` for the tenant default.
+* **New Resource:** `watchpoint_tenant_monitoring_policy` - the tenant-wide
+  Terraform-managed lock and monitor change approvals. Only configured
+  attributes are sent, since each half needs its own plan feature; destroy turns
+  both off.
+* **New Resource:** `watchpoint_export_sink` - daily data export to Azure Blob or
+  S3. The credential is write-only (`secret_hint` shows its last characters).
+* **New Resource:** `watchpoint_maintenance_calendar_feed` - maintenance windows
+  from an ICS feed. The feed URL is sensitive and write-only.
+* **New Resource:** `watchpoint_maintenance_change_source` - maintenance windows
+  from ServiceNow or Jira change tickets; exposes `webhook_url` and the
+  create-time signing `secret`.
+* **New Resource:** `watchpoint_report_share_link` - a public link to a scheduled
+  report. Immutable; `token` and `url` are sensitive and returned on create only.
+* **Environments everywhere:** every monitor resource gains `environment_id`;
+  `watchpoint_maintenance_window` and `watchpoint_scheduled_report` gain
+  `environment_ids`; `watchpoint_alert_routing_rule` accepts the `Environment`
+  condition type; `watchpoint_resource_acl` accepts the `environment` kind.
+* **Content change detection:** `watchpoint_http_monitor` and
+  `watchpoint_synthetic_monitor` gain `content_change_mode` and
+  `content_ignore_regex`.
+* **Status page localization:** `watchpoint_status_page` gains
+  `enabled_languages`, and `default_language` now accepts all seven shipped
+  languages (`en`, `de`, `fr`, `es`, `pt-BR`, `ja`, `nl`).
+* **New Resource:** `watchpoint_status_page_translation` - per-language
+  translations of a status page's text. Manages only the entries it lists, so
+  translations added in the portal are left alone.
+
+* **Managed monitors:** every monitor resource (`watchpoint_http_monitor`,
+  `watchpoint_ssl_monitor`, `watchpoint_synthetic_monitor`, `watchpoint_dns_monitor`,
+  `watchpoint_tcp_monitor`, `watchpoint_ping_monitor`, `watchpoint_heartbeat_monitor`,
+  `watchpoint_mail_monitor`, `watchpoint_udp_monitor`, `watchpoint_domain_monitor`)
+  now marks the monitor as managed by Terraform on create, update, SLA attach and
+  import. Watchpoint shows a "Managed by Terraform" badge, warns before edits made
+  elsewhere, and (Scale plan and above) can lock edits made outside Terraform and
+  list drift since the last apply. New optional provider argument `workspace`
+  (defaults to `TF_WORKSPACE`, else `default`). `terraform import` sends one empty
+  update to record the marker; if that fails the import still succeeds with a
+  warning. See the "Managed monitors" guide.
+
+## 1.1.0 (2026-10-16)
 
 FEATURES:
 

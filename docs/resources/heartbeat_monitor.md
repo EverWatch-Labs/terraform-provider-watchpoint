@@ -53,6 +53,7 @@ output "nightly_invoicing_ping_url" {
 
 - `alert_profile_id` (String) Profile that controls notification channels and routing.
 - `cron_expression` (String) Five-field cron schedule the job runs on, for example `0 2 * * 1-5`. When set it replaces `expected_period_seconds` for overdue detection: a ping is expected at each scheduled run plus `grace_period_seconds`, so a weekday job stays quiet at the weekend. Six-field (seconds) cron is rejected.
+- `environment_id` (String) Environment the monitor belongs to (a `watchpoint_environment` id). When omitted, a new monitor joins the tenant's default environment and an existing one keeps its environment. Reads return the effective environment, so a monitor that follows the default shows the default's id.
 - `expected_period_seconds` (Number) How often the job is expected to ping, in seconds. Defaults to `3600`. Between `60` and `2592000` (30 days).
 - `grace_period_seconds` (Number) Slack allowed on top of `expected_period_seconds` before the monitor is marked down, in seconds. Defaults to `300`. Between `0` and `2592000`.
 - `group_id` (String) Monitor group this monitor belongs to.

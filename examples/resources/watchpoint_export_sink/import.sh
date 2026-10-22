@@ -1,0 +1,1 @@
+terraform import watchpoint_export_sink.lake sink_0192f0c1

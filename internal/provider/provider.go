@@ -29,9 +29,10 @@ func New(version string) func() provider.Provider {
 
 // providerModel maps the provider configuration block.
 type providerModel struct {
-	APIKey   types.String `tfsdk:"api_key"`
-	BaseURL  types.String `tfsdk:"base_url"`
-	TenantID types.String `tfsdk:"tenant_id"`
+	APIKey    types.String `tfsdk:"api_key"`
+	BaseURL   types.String `tfsdk:"base_url"`
+	TenantID  types.String `tfsdk:"tenant_id"`
+	Workspace types.String `tfsdk:"workspace"`
 }
 
 func (p *watchpointProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -63,6 +64,12 @@ func (p *watchpointProvider) Schema(_ context.Context, _ provider.SchemaRequest,
 					"`WATCHPOINT_BASE_URL` environment variable.",
 				Optional: true,
 			},
+			"workspace": schema.StringAttribute{
+				MarkdownDescription: "Workspace name recorded on every monitor this provider creates or updates, " +
+					"shown in Watchpoint as \"Managed by Terraform (workspace X)\". Defaults to the " +
+					"`TF_WORKSPACE` environment variable, else `default`.",
+				Optional: true,
+			},
 		},
 	}
 }
@@ -77,6 +84,7 @@ func (p *watchpointProvider) Configure(ctx context.Context, req provider.Configu
 	apiKey := stringOrEnv(cfg.APIKey, "WATCHPOINT_API_KEY")
 	tenantID := stringOrEnv(cfg.TenantID, "WATCHPOINT_TENANT_ID")
 	baseURL := stringOrEnv(cfg.BaseURL, "WATCHPOINT_BASE_URL")
+	workspace := stringOrEnv(cfg.Workspace, "TF_WORKSPACE")
 
 	if apiKey == "" {
 		resp.Diagnostics.AddAttributeError(
@@ -100,6 +108,7 @@ func (p *watchpointProvider) Configure(ctx context.Context, req provider.Configu
 		BaseURL:   baseURL,
 		APIKey:    apiKey,
 		TenantID:  tenantID,
+		Workspace: workspace,
 		UserAgent: "terraform-provider-watchpoint/" + p.version,
 	})
 	resp.ResourceData = c
@@ -120,6 +129,8 @@ func (p *watchpointProvider) Resources(_ context.Context) []func() resource.Reso
 		NewUDPMonitorResource,
 		NewDomainMonitorResource,
 		NewMonitorPolicyResource,
+		NewTenantMonitoringPolicyResource,
+		NewEnvironmentResource,
 		// Profiles & alerting
 		NewAlertProfileResource,
 		NewThresholdProfileResource,
@@ -137,6 +148,8 @@ func (p *watchpointProvider) Resources(_ context.Context) []func() resource.Reso
 		NewMonitorGroupMemberResource,
 		NewMonitorDependencyResource,
 		NewMaintenanceWindowResource,
+		NewCalendarFeedResource,
+		NewChangeSourceResource,
 		NewDeploymentResource,
 		NewVaultSecretResource,
 		NewExternalVaultResource,
@@ -145,6 +158,7 @@ func (p *watchpointProvider) Resources(_ context.Context) []func() resource.Reso
 		NewDashboardResource,
 		NewDashboardFolderResource,
 		NewScheduledReportResource,
+		NewReportShareLinkResource,
 		// Identity
 		NewRoleResource,
 		NewAPIKeyResource,
@@ -172,6 +186,7 @@ func (p *watchpointProvider) Resources(_ context.Context) []func() resource.Reso
 		NewStatusPageExternalSourceResource,
 		NewStatusPageComponentGroupResource,
 		NewStatusPageSubscriberResource,
+		NewStatusPageTranslationResource,
 		NewIncidentUpdateTemplateResource,
 		// RUM
 		NewRUMSiteResource,
@@ -180,6 +195,7 @@ func (p *watchpointProvider) Resources(_ context.Context) []func() resource.Reso
 		NewLogPipelineResource,
 		NewLogArchiveDestinationResource,
 		NewCloudIntegrationResource,
+		NewExportSinkResource,
 	}
 }
 
@@ -187,6 +203,7 @@ func (p *watchpointProvider) DataSources(_ context.Context) []func() datasource.
 	return []func() datasource.DataSource{
 		NewRegionsDataSource,
 		NewMonitorsDataSource,
+		NewEnvironmentDataSource,
 		NewLocationProfileDataSource,
 		NewAlertProfileDataSource,
 		NewThresholdProfileDataSource,
